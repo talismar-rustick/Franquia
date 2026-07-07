@@ -1,205 +1,183 @@
-document.addEventListener('DOMContentLoaded', () => {
-    // Elements
-    const franchiseSelect = document.getElementById('franchise-select');
-    const storeSearch = document.getElementById('store-search');
-    const clearSearchBtn = document.getElementById('clear-search');
-    const resultsList = document.getElementById('results-list');
-    const resultsCount = document.getElementById('results-count');
-    const toastContainer = document.getElementById('toast-container');
+// ============================================================
+// CONFIGURAÇÃO — preencha a URL após deployar o Apps Script
+// ============================================================
+const APPS_SCRIPT_URL = "https://script.google.com/a/macros/ifood.com.br/s/AKfycbwRb065330AmN4Z5QjOnporfzLD31I_LQxYvZwYQQXRb_-adzSe-Sb1BnbszgH8NV3p/exec";
+// ============================================================
 
-    let currentStores = [];
-    
-    // Sort franchises alphabetically
-    franquiasData.sort((a, b) => a.franchise.localeCompare(b.franchise));
+let allFranquias = [];
+let currentLojas = [];
 
-    // Initialize Franchise Select
-    franquiasData.forEach((data, index) => {
-        const option = document.createElement('option');
-        option.value = index;
-        option.textContent = data.franchise;
-        franchiseSelect.appendChild(option);
-    });
-
-    // Event Listeners
-    franchiseSelect.addEventListener('change', (e) => {
-        const selectedIndex = e.target.value;
-        
-        if (selectedIndex === "") {
-            storeSearch.disabled = true;
-            storeSearch.value = "";
-            clearSearchBtn.hidden = true;
-            currentStores = [];
-            renderEmptyState("Selecione uma franquia para ver as lojas.");
-            updateCount(0);
-        } else {
-            storeSearch.disabled = false;
-            currentStores = franquiasData[selectedIndex].stores;
-            // Sort stores alphabetically by name
-            currentStores.sort((a, b) => a.name.localeCompare(b.name));
-            renderStores(currentStores);
-            storeSearch.value = "";
-            clearSearchBtn.hidden = true;
-        }
-    });
-
-    storeSearch.addEventListener('input', (e) => {
-        const query = e.target.value.toLowerCase().trim();
-        clearSearchBtn.hidden = query.length === 0;
-        
-        if (query === "") {
-            renderStores(currentStores);
-            return;
-        }
-
-        const filtered = currentStores.filter(store => 
-            store.name.toLowerCase().includes(query) || 
-            store.city.toLowerCase().includes(query)
-        );
-        
-        renderStores(filtered);
-    });
-
-    clearSearchBtn.addEventListener('click', () => {
-        storeSearch.value = "";
-        clearSearchBtn.hidden = true;
-        storeSearch.focus();
-        renderStores(currentStores);
-    });
-
-    // Render Functions
-    function renderEmptyState(message) {
-        resultsList.innerHTML = `
-            <div class="empty-state">
-                <i class="ri-store-3-line"></i>
-                <p>${message}</p>
-            </div>
-        `;
-    }
-
-    function renderStores(stores) {
-        updateCount(stores.length);
-        
-        if (stores.length === 0) {
-            renderEmptyState("Nenhuma loja encontrada para sua busca.");
-            return;
-        }
-
-        resultsList.innerHTML = '';
-        
-        // Use document fragment for better performance
-        const fragment = document.createDocumentFragment();
-
-        stores.forEach((store, index) => {
-            const card = document.createElement('div');
-            card.className = 'store-card';
-            // Add staggered animation delay
-            card.style.animationDelay = `${Math.min(index * 0.05, 0.5)}s`;
-            
-            const cityHtml = store.city ? `<span class="store-city"><i class="ri-map-pin-line"></i> ${store.city}</span>` : '';
-            
-            card.innerHTML = `
-                <div class="store-info">
-                    <span class="store-name">${store.name}</span>
-                    ${cityHtml}
-                </div>
-                <button class="copy-btn" data-id="${store.id}">
-                    <i class="ri-file-copy-line"></i> Copiar ID
-                </button>
-            `;
-            
-            const copyBtn = card.querySelector('.copy-btn');
-            copyBtn.addEventListener('click', () => handleCopy(store.id, copyBtn));
-            
-            fragment.appendChild(card);
-        });
-
-        resultsList.appendChild(fragment);
-    }
-
-    function updateCount(count) {
-        if (count === 0) {
-            resultsCount.textContent = "0 lojas";
-        } else if (count === 1) {
-            resultsCount.textContent = "1 loja encontrada";
-        } else {
-            resultsCount.textContent = `${count} lojas encontradas`;
-        }
-    }
-
-    // Copy ID functionality
-    function handleCopy(id, btnElement) {
-        // Fallback for older devices/browsers
-        if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(id).then(() => {
-                showSuccess(btnElement);
-            }).catch(err => {
-                console.error("Falha ao copiar: ", err);
-                fallbackCopyTextToClipboard(id, btnElement);
-            });
-        } else {
-            fallbackCopyTextToClipboard(id, btnElement);
-        }
-    }
-
-    function fallbackCopyTextToClipboard(text, btnElement) {
-        const textArea = document.createElement("textarea");
-        textArea.value = text;
-        
-        // Avoid scrolling to bottom
-        textArea.style.top = "0";
-        textArea.style.left = "0";
-        textArea.style.position = "fixed";
-
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-
-        try {
-            const successful = document.execCommand('copy');
-            if (successful) {
-                showSuccess(btnElement);
-            } else {
-                showToast("Erro ao copiar ID", false);
-            }
-        } catch (err) {
-            console.error('Fallback: Oops, unable to copy', err);
-            showToast("Erro ao copiar ID", false);
-        }
-
-        document.body.removeChild(textArea);
-    }
-
-    function showSuccess(btnElement) {
-        // Visual feedback on button
-        const originalHtml = btnElement.innerHTML;
-        btnElement.classList.add('success');
-        btnElement.innerHTML = `<i class="ri-check-line"></i> Copiado!`;
-        
-        showToast("ID copiado com sucesso!");
-
-        setTimeout(() => {
-            btnElement.classList.remove('success');
-            btnElement.innerHTML = originalHtml;
-        }, 2000);
-    }
-
-    function showToast(message, isSuccess = true) {
-        const toast = document.createElement('div');
-        toast.className = 'toast';
-        
-        const icon = isSuccess ? 'ri-checkbox-circle-fill' : 'ri-error-warning-fill';
-        toast.innerHTML = `<i class="${icon}"></i> ${message}`;
-        
-        toastContainer.appendChild(toast);
-        
-        // Remove toast after animation
-        setTimeout(() => {
-            toast.classList.add('hiding');
-            setTimeout(() => {
-                if(toast.parentNode) {
-                    toast.parentNode.removeChild(toast);
-                }
-            }, 300); // match CSS animation duration
-        }, 2500);
-    }
+// -------- bootstrap --------
+document.addEventListener("DOMContentLoaded", () => {
+  if (!APPS_SCRIPT_URL) {
+    showStatus(
+      "⚙️ Configure a URL do Apps Script no arquivo <strong>app.js</strong> (variável <code>APPS_SCRIPT_URL</code>).",
+      "warning"
+    );
+    return;
+  }
+  loadData();
 });
+
+// -------- data fetching --------
+async function loadData() {
+  showStatus("Carregando dados...", "loading");
+
+  try {
+    const resp = await fetch(APPS_SCRIPT_URL);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+    const data = await resp.json();
+
+    if (!data.franquias || !Array.isArray(data.franquias)) {
+      throw new Error("Formato de dados inválido: campo 'franquias' ausente.");
+    }
+
+    allFranquias = data.franquias;
+    populateDropdown(allFranquias);
+    hideStatus();
+    document.getElementById("controls").classList.remove("hidden");
+  } catch (err) {
+    showStatus(
+      `❌ Erro ao carregar dados: <strong>${err.message}</strong><br>Verifique a URL do Apps Script e as permissões de acesso.`,
+      "error"
+    );
+    console.error(err);
+  }
+}
+
+// -------- dropdown --------
+function populateDropdown(franquias) {
+  const select = document.getElementById("franquiaSelect");
+  select.innerHTML = '<option value="">-- Selecione uma franquia --</option>';
+
+  franquias.forEach((f, i) => {
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = f.nome;
+    select.appendChild(opt);
+  });
+
+  select.addEventListener("change", onFranquiaChange);
+}
+
+function onFranquiaChange() {
+  const idx = this.value;
+  const searchInput = document.getElementById("searchInput");
+  searchInput.value = "";
+
+  if (idx === "") {
+    currentLojas = [];
+    renderLojas([]);
+    document.getElementById("lojaSection").classList.add("hidden");
+    return;
+  }
+
+  currentLojas = allFranquias[idx].lojas || [];
+  document.getElementById("lojaSection").classList.remove("hidden");
+  renderLojas(currentLojas);
+}
+
+// -------- search --------
+document.addEventListener("DOMContentLoaded", () => {
+  const searchInput = document.getElementById("searchInput");
+  if (searchInput) {
+    searchInput.addEventListener("input", () => {
+      const q = searchInput.value.trim().toLowerCase();
+      const filtered = q
+        ? currentLojas.filter(
+            (l) =>
+              l.id.toLowerCase().includes(q) ||
+              l.nome.toLowerCase().includes(q)
+          )
+        : currentLojas;
+      renderLojas(filtered);
+    });
+  }
+});
+
+// -------- render --------
+function renderLojas(lojas) {
+  const container = document.getElementById("lojaList");
+  const counter = document.getElementById("lojaCount");
+
+  counter.textContent =
+    lojas.length === 1 ? "1 loja encontrada" : `${lojas.length} lojas encontradas`;
+
+  if (lojas.length === 0) {
+    container.innerHTML =
+      '<p class="empty-msg">Nenhuma loja encontrada para essa busca.</p>';
+    return;
+  }
+
+  container.innerHTML = lojas
+    .map(
+      (l) => `
+      <div class="loja-card">
+        <div class="loja-info">
+          <span class="loja-id">${escHtml(l.id)}</span>
+          <span class="loja-nome">${escHtml(l.nome)}</span>
+        </div>
+        <button class="btn-copy" data-id="${escAttr(l.id)}" onclick="copyId(this)">
+          Copiar ID
+        </button>
+      </div>`
+    )
+    .join("");
+}
+
+// -------- copy --------
+function copyId(btn) {
+  const id = btn.dataset.id;
+  navigator.clipboard
+    .writeText(id)
+    .then(() => {
+      btn.textContent = "✓ Copiado!";
+      btn.classList.add("copied");
+      setTimeout(() => {
+        btn.textContent = "Copiar ID";
+        btn.classList.remove("copied");
+      }, 2000);
+    })
+    .catch(() => {
+      // fallback para ambientes sem clipboard API
+      const ta = document.createElement("textarea");
+      ta.value = id;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      btn.textContent = "✓ Copiado!";
+      btn.classList.add("copied");
+      setTimeout(() => {
+        btn.textContent = "Copiar ID";
+        btn.classList.remove("copied");
+      }, 2000);
+    });
+}
+
+// -------- status helpers --------
+function showStatus(msg, type) {
+  const el = document.getElementById("statusMsg");
+  el.innerHTML = msg;
+  el.className = `status-box status-${type}`;
+  el.classList.remove("hidden");
+}
+
+function hideStatus() {
+  document.getElementById("statusMsg").classList.add("hidden");
+}
+
+// -------- sanitisation helpers --------
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function escAttr(str) {
+  return String(str).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
